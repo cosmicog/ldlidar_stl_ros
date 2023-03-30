@@ -2,8 +2,8 @@
  * @file main.cpp
  * @author LDRobot (marketing1@ldrobot.com)
  * @brief  main process App
- *         This code is only applicable to LDROBOT LiDAR LD06 products 
- * sold by Shenzhen LDROBOT Co., LTD    
+ *         This code is only applicable to LDROBOT LiDAR LD06 products
+ * sold by Shenzhen LDROBOT Co., LTD
  * @version 0.1
  * @date 2021-10-28
  *
@@ -21,7 +21,7 @@
 #include "ros_api.h"
 #include "ldlidar_driver.h"
 
-void  ToLaserscanMessagePublish(ldlidar::Points2D& src, double lidar_spin_freq, 
+void  ToLaserscanMessagePublish(ldlidar::Points2D& src, double lidar_spin_freq,
     LaserScanSetting& setting, ros::Publisher& lidarpub);
 
 uint64_t GetSystemTimeStamp(void);
@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
   int serial_port_baudrate;
   LaserScanSetting setting;
   ldlidar::LDType type_name;
-	
+
   nh_private.getParam("product_name", product_name);
 	nh_private.getParam("topic_name", topic_name);
   nh_private.param("frame_id", setting.frame_id, std::string("base_laser"));
@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
   ROS_INFO("<angle_crop_max>: %f", setting.angle_crop_max);
 
   if (product_name == "LDLiDAR_LD06") {
-    type_name = ldlidar::LDType::LD_06; 
+    type_name = ldlidar::LDType::LD_06;
   } else if (product_name == "LDLiDAR_LD19") {
     type_name = ldlidar::LDType::LD_19;
   } else {
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  ldlidarnode->RegisterGetTimestampFunctional(std::bind(&GetSystemTimeStamp)); 
+  ldlidarnode->RegisterGetTimestampFunctional(std::bind(&GetSystemTimeStamp));
 
   ldlidarnode->EnableFilterAlgorithnmProcess(true);
 
@@ -88,19 +88,19 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  
-  ros::Publisher lidar_pub = 
+
+  ros::Publisher lidar_pub =
       nh.advertise<sensor_msgs::LaserScan>(topic_name, 10);  // create a ROS topic
-  
+
   ros::Rate r(10); //10hz
   ldlidar::Points2D laser_scan_points;
   double lidar_scan_freq;
   ROS_INFO("Publish topic message:ldlidar scan data .");
-  
+
   while (ros::ok()) {
 
     switch (ldlidarnode->GetLaserScanData(laser_scan_points, 1500)){
-      case ldlidar::LidarStatus::NORMAL: 
+      case ldlidar::LidarStatus::NORMAL:
         ldlidarnode->GetLidarScanFreq(lidar_scan_freq);
         ToLaserscanMessagePublish(laser_scan_points, lidar_scan_freq, setting, lidar_pub);
         break;
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-void  ToLaserscanMessagePublish(ldlidar::Points2D& src, double lidar_spin_freq, 
+void  ToLaserscanMessagePublish(ldlidar::Points2D& src, double lidar_spin_freq,
     LaserScanSetting& setting, ros::Publisher& lidarpub) {
   float angle_min, angle_max, range_min, range_max, angle_increment;
   float scan_time;
@@ -144,8 +144,8 @@ void  ToLaserscanMessagePublish(ldlidar::Points2D& src, double lidar_spin_freq,
   // Adjust the parameters according to the demand
   angle_min = 0;
   angle_max = (2 * M_PI);
-  range_min = 0.02;
-  range_max = 12;
+  range_min = 0.0;
+  range_max = 12.0;
   int beam_size = static_cast<int>(src.size());
   angle_increment = (angle_max - angle_min) / (float)(beam_size -1);
 
@@ -167,16 +167,21 @@ void  ToLaserscanMessagePublish(ldlidar::Points2D& src, double lidar_spin_freq,
     output.scan_time = scan_time;
     // First fill all the data with Nan
     output.ranges.assign(beam_size, std::numeric_limits<float>::quiet_NaN());
-    output.intensities.assign(beam_size, std::numeric_limits<float>::quiet_NaN());
+    output.intensities.assign(beam_size, 0.0);
 
     for (auto point : src) {
       float range = point.distance / 1000.f;  // distance unit transform to meters
-      float intensity = point.intensity;      // laser receive intensity 
+      float intensity = point.intensity;      // laser receive intensity
       float dir_angle = point.angle;
 
-      if ((point.distance == 0) && (point.intensity == 0)) { // filter is handled to  0, Nan will be assigned variable.
-        range = std::numeric_limits<float>::quiet_NaN(); 
-        intensity = std::numeric_limits<float>::quiet_NaN();
+      if (point.distance == 0) {
+        if(point.intensity == 0) { // filter is handled to  0, inf will be assigned variable.
+          range = std::numeric_limits<float>::infinity();
+          intensity = 0.0;
+        }
+        else {
+          range = 0.005;
+        }
       }
 
       if (setting.enable_angle_crop_func) { // Angle crop setting, Mask data within the set angle range
@@ -190,7 +195,7 @@ void  ToLaserscanMessagePublish(ldlidar::Points2D& src, double lidar_spin_freq,
       int index = static_cast<int>(ceil((angle - angle_min) / angle_increment));
       if (index < beam_size) {
         if (index < 0) {
-          ROS_ERROR("[ldrobot] error index: %d, beam_size: %d, angle: %f, angle_min: %f, angle_increment: %f", 
+          ROS_ERROR("[ldrobot] error index: %d, beam_size: %d, angle: %f, angle_min: %f, angle_increment: %f",
               index, beam_size, angle, angle_min, angle_increment);
         }
 
@@ -222,11 +227,11 @@ void  ToLaserscanMessagePublish(ldlidar::Points2D& src, double lidar_spin_freq,
     }
     lidarpub.publish(output);
     end_scan_time = start_scan_time;
-  } 
+  }
 }
 
 uint64_t GetSystemTimeStamp(void) {
-  std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> tp = 
+  std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> tp =
     std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now());
   auto tmp = std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch());
   return ((uint64_t)tmp.count());
