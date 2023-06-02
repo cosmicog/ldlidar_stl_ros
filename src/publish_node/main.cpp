@@ -170,7 +170,7 @@ void  ToLaserscanMessagePublish(ldlidar::Points2D& src, double lidar_spin_freq,
     output.intensities.assign(beam_size, 0.0);
 
     for (auto point : src) {
-      float range = point.distance / 1000.f;  // distance unit transform to meters
+      float range = (point.distance / 1000.f) + 0.017645;  // distance unit transform to meters, moved to center
       float intensity = point.intensity;      // laser receive intensity
       float dir_angle = point.angle;
 
