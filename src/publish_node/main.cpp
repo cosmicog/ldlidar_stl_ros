@@ -175,13 +175,8 @@ void  ToLaserscanMessagePublish(ldlidar::Points2D& src, double lidar_spin_freq,
       float dir_angle = point.angle;
 
       if (point.distance == 0) {
-        if(point.intensity == 0) { // filter is handled to  0, inf will be assigned variable.
-          range = std::numeric_limits<float>::infinity();
-          intensity = 0.0;
-        }
-        else {
-          range = 0.005;
-        }
+        range = std::numeric_limits<float>::infinity();
+        intensity = 0.0;
       }
 
       if (setting.enable_angle_crop_func) { // Angle crop setting, Mask data within the set angle range
